@@ -15,9 +15,9 @@
    ===================================================================== */
 
 window.CYRENIA_CONFIG = {
-  SUPABASE_URL:      "https://YOUR-PROJECT-ID.supabase.co",
-  SUPABASE_ANON_KEY: "YOUR-PUBLIC-ANON-KEY",
+  SUPABASE_URL:      "https://zgyqrjhtyyhfvdgjnish.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_tGO36B83v1B8dRcMhY3UmQ_IDuRiaiq",
 
-  BREACH_AT_MIN: 60,   // BlackOrchard note seizes every screen, this many minutes after start
-  REVEAL_AT_MIN: 90    // consequences auto-reveal, this many minutes after start
+  BREACH_AT_MIN: 2,    // BlackOrchard note seizes every screen, this many minutes after start
+  REVEAL_AT_MIN: 4     // consequences auto-reveal, this many minutes after start
 };
