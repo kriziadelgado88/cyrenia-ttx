@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyrenia — Results Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#0E1419; --panel:#161E25; --panel-2:#1C262E; --line:#2A3742;
+    --bone:#E8E2D4; --bone-dim:#A9B2B0; --slate:#6B7A85;
+    --amber:#F2A23C; --amber-soft:#3a2f1c; --red:#E5484D; --red-soft:#3a1d1f;
+    --teal:#3DD6A0; --teal-soft:#16332b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:radial-gradient(900px 500px at 80% -10%,rgba(242,162,60,.07),transparent 60%),radial-gradient(800px 600px at -10% 110%,rgba(61,214,160,.05),transparent 60%),var(--ink);color:var(--bone);font-family:'Space Grotesk',system-ui,sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px 22px 70px}
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:20px}
+  .brandmark{width:40px;height:40px;border:1px solid var(--amber);border-radius:9px;display:grid;place-items:center;color:var(--amber);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
+  .spacer{flex:1}
+  .phasepill{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:7px 12px;border:1px solid var(--line);border-radius:999px;color:var(--bone-dim)}
+  .phasepill.act2{color:var(--red);border-color:rgba(229,72,77,.4)}
+  .phasepill.results{color:var(--teal);border-color:rgba(61,214,160,.4)}
+  .clock{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--slate)}
+
+  .summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .stat{flex:1;min-width:160px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .stat .v{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;line-height:1}
+  .stat .k{font-size:11px;color:var(--slate);letter-spacing:.08em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-top:4px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+  .station{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;position:relative;overflow:hidden}
+  .sname{font-size:18px;font-weight:600}
+  .ssub{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--slate);letter-spacing:.06em;margin-top:2px}
+  .ssub.locked{color:var(--teal)}
+  .minibars{display:flex;flex-direction:column;gap:6px;margin:14px 0 4px}
+  .mb{display:grid;grid-template-columns:78px 1fr auto;gap:8px;align-items:center;font-size:11px;font-family:'IBM Plex Mono',monospace}
+  .mb .mk{color:var(--bone-dim)} .mb .track{height:7px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+  .mb .track>i{display:block;height:100%;width:0;border-radius:4px;transition:width .5s} .mb .amt{color:var(--slate)}
+  .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .spill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;padding:4px 8px;border-radius:6px;border:1px solid var(--line);color:var(--slate);opacity:0;transform:translateY(6px)}
+  .station.reveal .spill{animation:flipin .5s forwards}
+  @keyframes flipin{to{opacity:1;transform:translateY(0)}}
+  .spill.secured{color:var(--teal);border-color:rgba(61,214,160,.45);background:var(--teal-soft)}
+  .spill.partial{color:var(--amber);border-color:rgba(242,162,60,.45);background:var(--amber-soft)}
+  .spill.failed{color:var(--red);border-color:rgba(229,72,77,.45);background:var(--red-soft)}
+  .rtag{margin-top:11px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;padding:8px 10px;border-radius:8px;border:1px dashed var(--line);color:var(--bone-dim);line-height:1.45;opacity:0}
+  .station.reveal .rtag{animation:flipin .5s .35s forwards}
+  .rtag.paid{border-color:rgba(242,162,60,.5);color:var(--amber)} .rtag.refused{border-color:rgba(61,214,160,.4);color:var(--teal)} .rtag.rejected{border-color:rgba(229,72,77,.5);color:var(--red)}
+  .score{position:absolute;top:16px;right:18px;font-family:'IBM Plex Mono',monospace;text-align:right}
+  .score .num{font-size:32px;font-weight:600;line-height:1} .score .cap{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--slate)}
+  .pos{margin-top:12px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--slate);line-height:1.5;opacity:0}
+  .station.reveal .pos{animation:flipin .5s .5s forwards}
+  .pos b{color:var(--bone-dim);font-weight:500}
+
+  .distro{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+  .distro h3{margin:0 0 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--bone-dim);font-weight:500}
+  .drow{margin-bottom:14px}
+  .drow .dt{font-size:14px;font-weight:600;margin-bottom:6px}
+  .dbar{display:flex;height:26px;border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+  .dseg{display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#11161a;white-space:nowrap;overflow:hidden}
+  .dlegend{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--slate);margin-top:5px}
+
+  .empty{text-align:center;color:var(--slate);padding:90px 20px;font-family:'IBM Plex Mono',monospace;font-size:15px;border:1px dashed var(--line);border-radius:16px;line-height:1.7}
+  .hint{font-size:12px;color:var(--slate);font-family:'IBM Plex Mono',monospace;margin-top:18px}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important}.mb .track>i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brandmark">CY</div>
+    <div>
+      <div class="eyebrow">Cyrenia · Emergency Operations Centre</div>
+      <div style="font-size:18px;font-weight:600;letter-spacing:-.01em">Results Dashboard</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="clock" id="clock"></div>
+    <div class="phasepill" id="phase">CONNECTING…</div>
+  </div>
+  <div id="summary" class="summary"></div>
+  <div id="distro"></div>
+  <div id="board"></div>
+</div>
+
+<script>
+const CFG=window.CYRENIA_CONFIG||{};
+const BREACH_AT_MIN=CFG.BREACH_AT_MIN||60, REVEAL_AT_MIN=CFG.REVEAL_AT_MIN||90;
+let SB=null;
+try{ if(window.supabase && CFG.SUPABASE_URL && !/YOUR-/.test(CFG.SUPABASE_URL)){ SB=window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY); } }catch(e){}
+
+/* ---------- model (shared with index.html) ---------- */
+const POOL=2000;
+const ESSENTIALS=[
+  {key:'pension',name:'Pension batch',full:650,weight:35},
+  {key:'health',name:'Health guarantee',full:350,weight:30},
+  {key:'reserve',name:'Household cash reserve',full:200,weight:20},
+  {key:'municipal',name:'Municipal transfers',full:300,weight:15},
+];
+const RANSOM_ITEM={key:'ransom',name:'Ransom payment',full:1350,danger:true};
+const fmt=n=>'$'+Math.round(n).toLocaleString()+'M';
+const RANSOM={
+  paid:{cls:'paid',txt:'PAID — partial key, restoration unverified, reserve drained'},
+  rejected:{cls:'rejected',txt:'PARTIAL OFFER REJECTED — funds gone, leaks proceed'},
+  refused:{cls:'refused',txt:'REFUSED — staged leaks begin, disability & health first'}
+};
+const DOSSIER=[
+  {key:'pension',title:'Pension continuity',opts:[{v:'full',l:'Run full batch'},{v:'partial',l:'Partial verified'},{v:'delay',l:'Delay'}]},
+  {key:'health',title:'Health guarantee',opts:[{v:'broad',l:'Broad guarantee'},{v:'emergency',l:'Emergency-only'},{v:'none',l:'No guarantee'}]},
+  {key:'data',title:'Data / AI',opts:[{v:'freeze',l:'Freeze automation'},{v:'advisory',l:'Advisory mode'},{v:'run',l:'Let it run'}]},
+  {key:'trust',title:'Public trust',opts:[{v:'candour',l:'Full candour'},{v:'reassure',l:'Reassure'},{v:'silent',l:'Stay silent'}]},
+];
+const SEGCOLORS=['#3DD6A0','#F2A23C','#E5484D'];
+function ratio(v,full){return full?v/full:0}
+function statusFor(r){return r>=1?'secured':r>=0.5?'partial':'failed'}
+function ransomOutcome(a){const amt=a||0;return amt<=0?'refused':amt>=1350?'paid':'rejected'}
+function continuityScore(a){let s=0;ESSENTIALS.forEach(it=>{s+=it.weight*Math.min(1,ratio(a[it.key]||0,it.full))});return Math.round(s)}
+
+/* ---------- state ---------- */
+let sessionStart=null, teams=[];
+const animated=new Set();
+function breachTime(){return sessionStart?sessionStart+BREACH_AT_MIN*60000:null}
+function revealTime(){return sessionStart?sessionStart+REVEAL_AT_MIN*60000:null}
+function isRansomLive(){return sessionStart&&Date.now()>=breachTime()}
+function isRevealed(){return sessionStart&&Date.now()>=revealTime()}
+
+/* ---------- data ---------- */
+async function fetchAll(){
+  if(!SB)return;
+  try{
+    const ctl=await SB.from('kv').select('value').eq('key','ctl').maybeSingle();
+    sessionStart=(ctl.data&&ctl.data.value&&ctl.data.value.sessionStart)||null;
+    const t=await SB.from('kv').select('key,value').like('key','team_%');
+    teams=(t.data||[]).map(r=>({key:r.key,...(r.value||{})})).filter(x=>x.name);
+    teams.sort((a,b)=>(a.ts||0)-(b.ts||0));
+  }catch(e){}
+  render();
+}
+
+/* ---------- render ---------- */
+function miniColor(r){return r>=1?'var(--teal)':r>=0.5?'var(--amber)':'var(--slate)'}
+function countUp(el,target){let c=0;const step=Math.max(1,Math.round(target/28));const id=setInterval(()=>{c+=step;if(c>=target){c=target;clearInterval(id)}el.textContent=c},22)}
+
+function render(){
+  const phaseEl=document.getElementById('phase');
+  const live=isRansomLive(), rev=isRevealed();
+  if(!SB){phaseEl.textContent='NOT CONFIGURED';document.getElementById('board').innerHTML='<div class="empty">Edit <b>config.js</b> with your Supabase details, then run <b>schema.sql</b>.<br>See the README.</div>';return}
+  if(!sessionStart){
+    phaseEl.textContent='STANDBY';phaseEl.className='phasepill';
+    document.getElementById('summary').innerHTML='';document.getElementById('distro').innerHTML='';
+    document.getElementById('board').innerHTML='<div class="empty">Waiting for the exercise to begin.<br>The clock starts when the first committee enters the war room.</div>';
+    return;
+  }
+  phaseEl.textContent = rev?'RESULTS':live?'ACT 2 · RANSOM LIVE':'ACT 1 · DELIBERATING';
+  phaseEl.className='phasepill'+(rev?' results':live?' act2':'');
+
+  // summary
+  const locked=teams.filter(t=>t.locked).length;
+  const sum=document.getElementById('summary');
+  if(rev){
+    const avg=teams.length?Math.round(teams.reduce((s,t)=>s+continuityScore(t.alloc||{}),0)/teams.length):0;
+    const paid=teams.filter(t=>ransomOutcome((t.alloc||{}).ransom)==='paid').length;
+    sum.innerHTML=`
+      <div class="stat"><div class="v">${teams.length}</div><div class="k">Committees</div></div>
+      <div class="stat"><div class="v">${avg}</div><div class="k">Avg continuity score</div></div>
+      <div class="stat"><div class="v">${paid}</div><div class="k">Paid full ransom</div></div>
+      <div class="stat"><div class="v">${teams.length-paid}</div><div class="k">Refused or partial</div></div>`;
+  } else {
+    sum.innerHTML=`
+      <div class="stat"><div class="v">${teams.length}</div><div class="k">Committees joined</div></div>
+      <div class="stat"><div class="v">${locked}</div><div class="k">Allocations locked</div></div>`;
+  }
+
+  // dossier distribution (results only)
+  const distro=document.getElementById('distro');
+  if(rev && teams.length){
+    let html='<div class="distro"><h3>How the room decided · each critical impact</h3>';
+    DOSSIER.forEach(d=>{
+      const counts=d.opts.map(o=>teams.filter(t=>(t.dossier||{})[d.key]===o.v).length);
+      const total=counts.reduce((a,b)=>a+b,0)||1;
+      const segs=d.opts.map((o,i)=>{const pct=counts[i]/total*100;return pct>0?`<div class="dseg" style="width:${pct}%;background:${SEGCOLORS[i]}">${counts[i]||''}</div>`:''}).join('');
+      const legend=d.opts.map((o,i)=>`${o.l} ${counts[i]}`).join('  ·  ');
+      html+=`<div class="drow"><div class="dt">${d.title}</div><div class="dbar">${segs}</div><div class="dlegend">${legend}</div></div>`;
+    });
+    html+='</div>';
+    distro.innerHTML=html;
+  } else { distro.innerHTML=''; }
+
+  // board
+  const board=document.getElementById('board');
+  if(!teams.length){board.innerHTML='<div class="empty">No committees yet.</div>';return}
+  const showItems = live ? [RANSOM_ITEM,...ESSENTIALS] : ESSENTIALS;
+  const sig='b|'+rev+'|'+live+'|'+teams.map(t=>t.key+JSON.stringify(t.alloc||{})+!!t.locked).join('|');
+  if(board.dataset.sig===sig)return; board.dataset.sig=sig;
+
+  const grid=document.createElement('div');grid.className='grid';
+  teams.forEach(t=>{
+    const a=t.alloc||{};
+    const score=continuityScore(a);
+    const card=document.createElement('div');card.className='station'+(rev?' reveal':'');
+    let mb='';
+    showItems.forEach(it=>{const r=Math.min(1,ratio(a[it.key]||0,it.full));const c=it.danger?'var(--red)':miniColor(r);mb+=`<div class="mb"><span class="mk">${it.name.split(' ')[0]}</span><span class="track"><i style="width:${r*100}%;background:${c}"></i></span><span class="amt">${fmt(a[it.key]||0)}</span></div>`;});
+    let pills='',rtag='',pos='';
+    if(rev){
+      ESSENTIALS.forEach((it,i)=>{const stt=statusFor(ratio(a[it.key]||0,it.full));pills+=`<span class="spill ${stt}" style="animation-delay:${i*0.08}s">${it.name.split(' ')[0]} · ${stt}</span>`;});
+      const ro=RANSOM[ransomOutcome(a.ransom)];rtag=`<div class="rtag ${ro.cls}">${ro.txt}</div>`;
+      const dp=DOSSIER.map(d=>{const o=d.opts.find(x=>x.v===(t.dossier||{})[d.key]);return o?`<b>${d.title}:</b> ${o.l}`:''}).filter(Boolean).join(' &nbsp;·&nbsp; ');
+      if(dp)pos=`<div class="pos">${dp}</div>`;
+    }
+    card.innerHTML=`
+      <div class="score"><div class="num" id="sc-${t.key}">${rev?'0':'—'}</div><div class="cap">continuity</div></div>
+      <div class="sname">${t.name}</div>
+      <div class="ssub ${t.locked?'locked':''}">${t.locked?'✓ locked':'working…'}</div>
+      <div class="minibars">${mb}</div>
+      <div class="pills">${pills}</div>${rtag}${pos}`;
+    grid.appendChild(card);
+    if(rev){const el=card.querySelector('#sc-'+t.key);const id=t.key;if(el){if(!animated.has(id)){animated.add(id);setTimeout(()=>countUp(el,score),500);}else{el.textContent=score;}}}
+  });
+  board.innerHTML='';board.appendChild(grid);
+}
+
+function tickClock(){
+  const el=document.getElementById('clock');if(!sessionStart){el.textContent='';return}
+  const elapsed=Math.floor((Date.now()-sessionStart)/1000);
+  const mm=String(Math.floor(elapsed/60)).padStart(2,'0'),ss=String(elapsed%60).padStart(2,'0');
+  el.textContent='session '+mm+':'+ss;
+}
+
+/* ---------- live + poll ---------- */
+if(SB){
+  SB.channel('kv-disp').on('postgres_changes',{event:'*',schema:'public',table:'kv'},()=>fetchAll()).subscribe();
+}
+setInterval(fetchAll,3000);
+setInterval(()=>{tickClock();render();},1000);
+fetchAll();
+</script>
+</body>
+</html>

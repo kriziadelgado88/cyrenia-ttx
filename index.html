@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyrenia Emergency Operations — Liquidity War Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#0E1419; --panel:#161E25; --panel-2:#1C262E; --line:#2A3742;
+    --bone:#E8E2D4; --bone-dim:#A9B2B0; --slate:#6B7A85;
+    --amber:#F2A23C; --amber-soft:#3a2f1c;
+    --red:#E5484D; --red-soft:#3a1d1f;
+    --teal:#3DD6A0; --teal-soft:#16332b;
+    --shadow:0 18px 40px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(900px 500px at 80% -10%, rgba(242,162,60,.07), transparent 60%),
+      radial-gradient(800px 600px at -10% 110%, rgba(61,214,160,.05), transparent 60%),
+      var(--ink);
+    color:var(--bone); font-family:'Space Grotesk', system-ui, sans-serif;
+    min-height:100vh; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:22px 18px 70px}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--slate)}
+  .hero-title{font-size:clamp(24px,4vw,36px);font-weight:700;line-height:1.06;margin:6px 0 8px;letter-spacing:-.01em}
+  .hero-sub{color:var(--bone-dim);font-size:14.5px;max-width:60ch;line-height:1.55}
+  .topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px}
+  .brandmark{width:38px;height:38px;border:1px solid var(--amber);border-radius:9px;display:grid;place-items:center;color:var(--amber);flex:0 0 auto;position:relative;overflow:hidden}
+  .brandmark::after{content:"";position:absolute;inset:0;background:var(--amber);opacity:.08}
+  .brandmark span{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:15px;position:relative}
+  .spacer{flex:1}
+  .pill{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line);border-radius:999px;color:var(--bone-dim)}
+  .pill.live{color:var(--amber);border-color:rgba(242,162,60,.4)}
+  .pill.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--amber);margin-right:7px;vertical-align:middle;animation:blink 1.4s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:18px}
+  .panel h2{margin:0 0 4px;font-size:13px;font-family:'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--bone-dim);font-weight:500}
+
+  .brief-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .brief-stamp{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber)}
+  .brief-lede{font-size:15px;line-height:1.6;color:var(--bone)}
+  .brief-lede strong{color:var(--amber)}
+  .exposure{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:6px}
+  .exo{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .exo .v{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;line-height:1}
+  .exo.warn .v{color:var(--amber)}
+  .exo .k{font-size:11.5px;color:var(--bone-dim);margin-top:6px;line-height:1.35}
+  .impacts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.impacts{grid-template-columns:1fr}}
+  .impact{background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:10px;padding:14px 16px}
+  .impact h4{margin:0 0 6px;font-size:15px}
+  .impact p{margin:0;font-size:13px;color:var(--bone-dim);line-height:1.5}
+  .impact .num{font-family:'IBM Plex Mono',monospace;color:var(--amber);font-size:12px;letter-spacing:.1em}
+
+  /* Decision dossier */
+  .stepper{display:flex;gap:8px;align-items:center;margin-bottom:16px}
+  .step{flex:1;height:4px;border-radius:3px;background:var(--panel-2)}
+  .step.done{background:var(--teal)} .step.active{background:var(--amber)}
+  .dossier-meta{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+  .dossier-title{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:0 0 10px;color:var(--bone)}
+  .dossier-sit{font-size:14px;line-height:1.6;color:var(--bone-dim);margin:0 0 16px}
+  .gq{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  .gq h3{margin:0 0 8px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slate);font-weight:500}
+  .gq ul{margin:0;padding-left:18px;color:var(--bone);font-size:13.5px;line-height:1.7}
+  .opt{width:100%;text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:10px;cursor:pointer;color:var(--bone);font:inherit;transition:.15s}
+  .opt:hover{border-color:var(--bone-dim)}
+  .opt.sel{border-color:var(--amber);background:rgba(242,162,60,.08)}
+  .opt .ol{font-size:15px;font-weight:600}
+  .opt .otrade{font-size:13px;color:var(--bone-dim);line-height:1.55;margin-top:8px;display:none}
+  .opt.sel .otrade{display:block;animation:slidein .35s}
+  .opt .otag{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);border:1px solid rgba(242,162,60,.4);border-radius:5px;padding:2px 7px;margin-top:10px}
+  .dossier-done{text-align:center;padding:8px 0}
+  .dossier-done .big{font-size:20px;font-weight:700;margin:6px 0 2px}
+  .positions{margin-top:8px;text-align:left}
+  .position{padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;color:var(--bone)}
+  .position .pk{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--slate);text-transform:uppercase;letter-spacing:.08em}
+
+  .reservoir{position:relative;height:30px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel-2);margin-top:10px}
+  .reservoir .fill{position:absolute;inset:0;width:100%;transform-origin:left;background:linear-gradient(90deg,var(--teal),#2fb98a);transition:transform .35s cubic-bezier(.4,.1,.2,1),background .3s}
+  .reservoir.over .fill{background:linear-gradient(90deg,var(--red),#c43b40)}
+  .reservoir .lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;mix-blend-mode:difference;color:#fff}
+  .budget-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .remaining{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600}
+  .remaining.neg{color:var(--red)}
+
+  .alloc{display:flex;flex-direction:column;gap:6px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .alloc:last-child{border-bottom:none}
+  .alloc.new{animation:slidein .5s}
+  @keyframes slidein{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+  .alloc-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .alloc-name{font-size:15px;font-weight:600}
+  .alloc-name.danger{color:var(--red)}
+  .alloc-sub{font-size:11.5px;color:var(--slate);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em}
+  .alloc-val{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;white-space:nowrap}
+  .tagnew{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.16em;background:var(--red);color:#1a0608;padding:2px 6px;border-radius:4px;margin-left:8px;vertical-align:middle}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line);outline:none;margin:4px 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;border-radius:50%;background:var(--bone);border:3px solid var(--ink);box-shadow:0 0 0 1px var(--amber);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--bone);border:3px solid var(--ink);box-shadow:0 0 0 1px var(--amber);cursor:pointer}
+  input[type=range]:focus-visible{box-shadow:0 0 0 3px rgba(242,162,60,.4)}
+  .fundbar{height:4px;border-radius:4px;background:var(--panel-2);overflow:hidden}
+  .fundbar > i{display:block;height:100%;width:0;background:var(--slate);transition:width .25s, background .25s}
+
+  .btn{font:inherit;font-weight:600;font-size:14px;border-radius:10px;padding:12px 18px;cursor:pointer;border:1px solid var(--line);background:var(--panel-2);color:var(--bone);transition:.15s}
+  .btn:hover{border-color:var(--bone-dim)}
+  .btn.primary{background:var(--amber);color:#1a1206;border-color:var(--amber)}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.breach{background:var(--red);color:#1a0608;border-color:var(--red);font-family:'IBM Plex Mono',monospace;letter-spacing:.04em}
+  .btn.breach:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .btn-lg{font-size:16px;padding:15px 26px}
+
+  .field{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input[type=text]{font:inherit;background:var(--panel-2);border:1px solid var(--line);color:var(--bone);border-radius:10px;padding:11px 13px;font-size:15px;flex:1;min-width:180px}
+  input::placeholder{color:var(--slate)}
+
+  .status-line{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--teal);margin-top:12px;display:flex;align-items:center;gap:8px;line-height:1.5}
+  .status-line.wait{color:var(--amber)} .status-line.locked{color:var(--slate)}
+
+  /* Act 2 decision clock */
+  .dclock{text-align:center}
+  .dclock .t{font-family:'IBM Plex Mono',monospace;font-size:clamp(40px,12vw,72px);font-weight:600;line-height:1}
+  .dclock .t.warn{color:var(--amber)} .dclock .t.crit{color:var(--red);animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .dclock .l{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--slate);margin-top:6px}
+
+  .outcome-row{padding:9px 0;border-top:1px solid var(--line)}
+  .outcome-row .st{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase}
+  .ransom-tag{margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:12px;padding:10px 12px;border-radius:8px;border:1px dashed var(--line);color:var(--bone-dim);line-height:1.5}
+  .ransom-tag.paid{border-color:rgba(242,162,60,.5);color:var(--amber)}
+  .ransom-tag.refused{border-color:rgba(61,214,160,.4);color:var(--teal)}
+  .ransom-tag.rejected{border-color:rgba(229,72,77,.5);color:var(--red)}
+  .scorebig{font-family:'IBM Plex Mono',monospace;font-size:13px;margin:6px 0 12px}
+  .scorebig strong{font-size:26px}
+
+  .note{margin-top:8px;font-size:12px;color:var(--slate);line-height:1.6;border-left:2px solid var(--line);padding-left:12px}
+  .reset-link{background:none;border:none;color:var(--slate);font:inherit;font-size:12px;font-family:'IBM Plex Mono',monospace;letter-spacing:.05em;cursor:pointer;text-decoration:underline;padding:0}
+  .reset-link:hover{color:var(--bone-dim)}
+  .hidden{display:none!important}
+
+  /* BREACH takeover */
+  #breach{position:fixed;inset:0;z-index:999;background:#08090b;display:none;align-items:center;justify-content:center;padding:20px;overflow:auto}
+  #breach.active{display:flex;animation:breachin .5s}
+  @keyframes breachin{from{opacity:0} to{opacity:1}}
+  #breach::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(255,255,255,.03) 0 1px,transparent 1px 3px);mix-blend-mode:overlay;animation:scan 7s linear infinite}
+  @keyframes scan{from{background-position-y:0}to{background-position-y:120px}}
+  .breach-inner{position:relative;max-width:640px;width:100%;font-family:'IBM Plex Mono',monospace}
+  .breach-alarm{color:var(--red);font-size:12px;letter-spacing:.28em;text-align:center;margin-bottom:12px;animation:flick 1.6s infinite}
+  @keyframes flick{0%,100%{opacity:1}48%{opacity:1}50%{opacity:.3}52%{opacity:1}}
+  .breach-title{color:#fff;font-size:clamp(22px,4.4vw,38px);font-weight:700;text-align:center;line-height:1.1;text-shadow:2px 0 var(--red),-2px 0 #2bd0ff;animation:glitch 2.6s infinite}
+  @keyframes glitch{0%,92%,100%{text-shadow:2px 0 var(--red),-2px 0 #2bd0ff}93%{text-shadow:-3px 0 var(--red),3px 0 #2bd0ff}96%{text-shadow:3px 0 var(--red),-3px 0 #2bd0ff}}
+  .breach-smile{color:var(--red);text-align:center}
+  .breach-box{border:1px solid #3a444c;border-radius:8px;padding:18px 20px;margin-top:18px;color:var(--bone);font-size:13px;line-height:1.6;background:rgba(20,24,28,.7)}
+  .breach-box .lab{color:var(--slate)}
+  .breach-box ul{margin:8px 0;padding-left:18px;color:var(--bone-dim)}
+  .breach-demand{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0;padding:12px 0;border-top:1px solid #3a444c;border-bottom:1px solid #3a444c}
+  .breach-demand .dl{color:var(--slate);font-size:10px;letter-spacing:.14em;display:block}
+  .breach-demand .dv{color:var(--amber);font-size:18px;font-weight:600;display:block}
+  .breach-threat{color:var(--red);font-size:12.5px;margin-top:4px}
+  .breach-sign{color:var(--bone-dim);text-align:right;margin-top:14px;font-style:italic}
+  .breach-actions{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none!important}
+    .reservoir .fill,.mb .track>i,.fundbar>i{transition:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brandmark"><span>CY</span></div>
+    <div>
+      <div class="eyebrow">Cyrenia · Emergency Operations Centre</div>
+      <div style="font-size:18px;font-weight:600;letter-spacing:-.01em">Liquidity War Room</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="pill live">LIVE SESSION</div>
+  </div>
+
+  <!-- ============ LANDING ============ -->
+  <section id="view-landing">
+    <div class="eyebrow">Tabletop exercise · Social Protection Continuity</div>
+    <h1 class="hero-title">The systems are down.<br>Keep people protected.</h1>
+    <p class="hero-sub">A cyberattack has crippled Cyrenia's social protection systems. Payments, digital identity, health eligibility and case files can no longer be trusted. Your committee controls a single $2.0&nbsp;billion emergency reserve — and a closing window to decide where it goes before the day runs out.</p>
+
+    <div class="panel" style="margin-top:26px">
+      <h2>Take your committee's seat</h2>
+      <div class="field" style="margin-top:12px">
+        <input type="text" id="team-name" placeholder="Name your committee — e.g. Treasury Cell, Table 3" maxlength="28" onkeydown="if(event.key==='Enter')joinTeam()">
+        <button class="btn primary" onclick="joinTeam()">Continue to briefing</button>
+      </div>
+    </div>
+
+    <p class="note">Every committee in the room shares one live exercise. Open this on each table's phone or laptop and name your committee to begin.</p>
+    <p style="margin-top:14px"><button class="reset-link" onclick="resetExercise()">Reset exercise for a new group</button></p>
+  </section>
+
+  <!-- ============ BRIEFING ============ -->
+  <section id="view-briefing" class="hidden">
+    <div id="briefing-body"></div>
+    <div style="text-align:center;margin-bottom:8px">
+      <button class="btn primary btn-lg" onclick="toConsole()">Enter the war room →</button>
+    </div>
+  </section>
+
+  <!-- ============ CONSOLE ============ -->
+  <section id="view-console" class="hidden">
+
+    <div id="stage-dossier"></div>
+
+    <div id="stage-alloc" class="hidden">
+      <div class="panel hidden" id="dclock-panel">
+        <div class="dclock">
+          <div class="t" id="dclock-t">--:--</div>
+          <div class="l" id="dclock-l">Decision window</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="budget-row">
+          <h2 style="margin:0">Emergency liquidity reserve</h2>
+          <span class="remaining" id="remaining">$2,000M left</span>
+        </div>
+        <div class="reservoir" id="reservoir"><div class="fill" id="res-fill"></div>
+          <div class="lbl"><span id="res-spent">$0M committed</span><span>POOL $2,000M</span></div>
+        </div>
+        <div class="status-line" id="phase-banner" style="color:var(--bone-dim);margin-top:14px">Turn your committee's positions into a budget — allocate the reserve across essential services.</div>
+      </div>
+
+      <div class="panel">
+        <h2 id="alloc-head">Allocate the reserve</h2>
+        <div id="alloc-list"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="lock-btn" onclick="lockAlloc()">Lock in allocation</button>
+        <button class="btn ghost" onclick="resetSliders()">Clear</button>
+      </div>
+      <div class="status-line wait" id="team-status" style="display:none"></div>
+    </div>
+
+    <div class="panel hidden" id="team-outcome" style="margin-top:18px">
+      <h2>Consequences of your decision</h2>
+      <div id="team-outcome-body"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ===== BREACH TAKEOVER ===== -->
+<div id="breach">
+  <div class="breach-inner">
+    <div class="breach-alarm">⚠ SIGNAL INTERRUPTED · UNAUTHORIZED BROADCAST · ALL INTERNAL SCREENS ⚠</div>
+    <div id="breach-target" style="color:var(--amber);text-align:center;font-size:12px;letter-spacing:.16em;margin-bottom:12px;font-family:'IBM Plex Mono',monospace"></div>
+    <div class="breach-title">YOUR DIGITAL STATE<br>IS IN OUR HANDS</div>
+    <div class="breach-smile">:)</div>
+    <div class="breach-box">
+      <div><span class="lab">// We have encrypted critical systems across Cyrenia.</span></div>
+      <div><span class="lab">// We have copied sensitive social protection records:</span></div>
+      <ul>
+        <li>pension contribution histories</li>
+        <li>disability assessments</li>
+        <li>child benefit files</li>
+        <li>health reimbursement records</li>
+        <li>internal fraud flags</li>
+      </ul>
+      <div><span class="lab">// Proof already sent to selected journalists and MPs.</span></div>
+      <div class="breach-demand">
+        <div><span class="dl">DEMAND</span><span class="dv">USD 1.35 BILLION</span></div>
+        <div><span class="dl">METHOD</span><span class="dv">cryptocurrency</span></div>
+        <div><span class="dl">DEADLINE</span><span class="dv">18 HOURS</span></div>
+      </div>
+      <div class="breach-threat">If refused: 250,000 beneficiary records released every 2 hours — disability and health files first.</div>
+      <div class="breach-sign">You built a state that depends on trust.<br>Now decide how much that trust is worth. — BlackOrchard</div>
+    </div>
+    <div class="breach-actions">
+      <button class="btn breach" onclick="dismissBreach()">Acknowledge — convene the committee</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   AUTOPILOT TIMING — set in config.js (minutes after meeting start).
+   "Meeting start" = when the first committee enters the war room.
+   ============================================================ */
+const _CFG = window.CYRENIA_CONFIG || {};
+const BREACH_AT_MIN = _CFG.BREACH_AT_MIN || 60;   // the BlackOrchard note seizes every screen
+const REVEAL_AT_MIN = _CFG.REVEAL_AT_MIN || 90;   // consequences auto-reveal
+
+/* ---------- model ---------- */
+const POOL = 2000;
+const ESSENTIALS = [
+  {key:'pension',  name:'Pension batch',         sub:'1.8M beneficiaries · clears in 12h',    full:650, weight:35},
+  {key:'health',   name:'Health guarantee',      sub:'Emergency care, maternity, meds · 72h', full:350, weight:30},
+  {key:'reserve',  name:'Household cash reserve', sub:'Offline offices · vulnerable families', full:200, weight:20},
+  {key:'municipal',name:'Municipal transfers',   sub:'Local service-point continuity',        full:300, weight:15},
+];
+const RANSOM_ITEM={key:'ransom',name:'Ransom payment',sub:'BlackOrchard demand · all-or-nothing',full:1350,danger:true};
+const fmt = n => '$'+Math.round(n).toLocaleString()+'M';
+
+const CONSEQ={
+  pension:{secured:'1.8M pensioners paid on time.',partial:'Partial run — priority pensioners paid; new retirees and corrections excluded.',failed:'Batch fails to clear — payments missed, crowds escalate.'},
+  health:{secured:'Emergency care, maternity and essential meds guaranteed for 72h.',partial:'Triage only — hospitals turn away non-critical patients.',failed:'No guarantee — catastrophic out-of-pocket costs, care delayed.'},
+  reserve:{secured:'Vulnerable households bridged past the 72h cash cliff.',partial:'Thin buffer — some households exhaust cash within 72h.',failed:'32% of households hit the wall inside 72h.'},
+  municipal:{secured:'Offline service points stay open across the country.',partial:'Reduced hours — queues build at the 39 working offices.',failed:'Local offices cannot operate offline.'}
+};
+const RANSOM={
+  paid:{cls:'paid',txt:'RANSOM PAID — partial decryption key supplied. Restoration unverified; no guarantee data won\u2019t leak. Reserve drained.'},
+  rejected:{cls:'rejected',txt:'PARTIAL OFFER REJECTED — BlackOrchard refuses anything below the full demand. Funds gone, leaks proceed.'},
+  refused:{cls:'refused',txt:'RANSOM REFUSED — staged leaks begin: disability and health files, 250k records every 2h.'}
+};
+const EXPOSURE=[
+  {v:'98%',k:'payments normally issued electronically'},
+  {v:'90%',k:'pensioners on the latest printed list'},
+  {v:'5%',k:'disability beneficiaries on a reliable paper list',warn:true},
+  {v:'15%',k:'providers able to verify eligibility',warn:true},
+  {v:'32%',k:'households without cash beyond 72h',warn:true},
+  {v:'41%',k:'staff reachable on official channels'},
+  {v:'1.8M',k:'pension batch due within 12 hours'},
+  {v:'39/118',k:'analogue service points operating'},
+];
+const IMPACTS=[
+  {n:'01',h:'Pension continuity',p:'A national payment run is due tomorrow. The file was built before the attack but the payment switch is frozen; the printed list is six weeks old and misses new retirees, deaths and fraud flags.'},
+  {n:'02',h:'Health without verification',p:'Hospitals run on generators with no electronic records. ERs already treat patients with no way to confirm coverage. Providers want a national reimbursement guarantee.'},
+  {n:'03',h:'Data, AI & automated decisions',p:'The citizen chatbot and ministerial systems give conflicting guidance. Automated queues suggest suspending duplicate cases, but no one can confirm the flags are real.'},
+  {n:'04',h:'Public trust & access',p:'Rumours spread that records were erased and only paper proof will be paid. Crowds gather, but only 39 offices can work offline and call centres are overwhelmed.'},
+];
+
+const DOSSIER=[
+  {key:'pension',meta:'Critical impact 01',title:'Pension continuity',
+   sit:'The monthly pension run for 1.8 million people clears in roughly 12 hours. The payment file was built before the attack, the payment switch is frozen, and the only clean fallback is a printed list six weeks old — it misses new retirees, recent deaths and fraud flags.',
+   q:['Do you run the payment batch in full, run a partial verified batch, or delay until integrity is confirmed?','How do you handle the ~10% of beneficiaries missing from the printed list?','Which is the costlier error here — a wrong payment, or a missed one?'],
+   opts:[
+     {v:'full',l:'Run the full batch now',tag:'Fiscal leakage',t:'1.8M are paid on time and public trust holds — but you knowingly pay deceased, duplicate and fraud-flagged accounts, creating fiscal loss and audit exposure.'},
+     {v:'partial',l:'Run a partial, verified batch',tag:'Coverage gap',t:'Clear priority cases are paid; new retirees and corrections wait. Around 10% face a gap and may crowd offices demanding answers.'},
+     {v:'delay',l:'Delay until integrity is confirmed',tag:'Hardship & unrest',t:'No wrong payments leave the treasury — but 1.8M miss rent and food money on schedule, hitting hardest the 32% of households with no cash buffer.'}
+   ]},
+  {key:'health',meta:'Critical impact 02',title:'Health guarantee',
+   sit:'Hospitals run on generators with no electronic records. Emergency rooms already treat patients with no way to confirm coverage, and only 15% of providers can verify eligibility. Provider associations are demanding a national reimbursement guarantee.',
+   q:['Do you issue a broad guarantee, an emergency-only guarantee, or none until verification returns?','How do you limit fraud when eligibility can\u2019t be checked electronically?','Which services are non-negotiable for the next 72 hours?'],
+   opts:[
+     {v:'broad',l:'Broad guarantee — treat all, reconcile later',tag:'Open exposure',t:'Care continues and the public is reassured — but you accept open-ended fiscal exposure and fraud you currently cannot detect.'},
+     {v:'emergency',l:'Emergency-only guarantee',tag:'Edge-case disputes',t:'Maternity, dialysis, trauma and essential meds are protected and exposure is bounded — but borderline cases get turned away and disputes follow.'},
+     {v:'none',l:'No guarantee until verification returns',tag:'Care denied',t:'Fiscal discipline holds — but hospitals turn patients away, families face catastrophic out-of-pocket costs, and the story goes public fast.'}
+   ]},
+  {key:'data',meta:'Critical impact 03',title:'Data, AI & automated decisions',
+   sit:'Nothing recorded after 09:03 can be trusted. The citizen chatbot and ministerial systems give conflicting guidance, and automated queues are flagging cases for suspension as duplicates or ineligible — but no one can confirm the flags are real.',
+   q:['For each system, do you trust it, verify before use, or freeze it?','Do you allow any automated suspensions to proceed?','What is your standing rule for acting on post-09:03 data?'],
+   opts:[
+     {v:'freeze',l:'Freeze all automation — manual only',tag:'Backlog risk',t:'No wrongful suspensions occur — but everything slows to manual speed and a backlog builds across every office.'},
+     {v:'advisory',l:'Advisory mode — humans confirm every flag',tag:'Staff-limited',t:'A workable balance of speed and safety — but it is only as reliable as the 41% of staff you can actually reach.'},
+     {v:'run',l:'Let automation run to clear the backlog',tag:'High harm',t:'Throughput stays fast — but you may suspend legitimate disabled and low-income beneficiaries on fabricated flags, harming the most exposed.'}
+   ]},
+  {key:'trust',meta:'Critical impact 04',title:'Public trust & access',
+   sit:'Rumours are spreading that records were erased and that only people with paper proof will be paid. Crowds are gathering, only 39 of 118 offices can operate offline, and call centres are overwhelmed.',
+   q:['What do you tell the public now, and through which channels?','Do you confirm, deny, or stay silent on the data rumours?','How do you protect access for those who can\u2019t reach the 39 working offices?'],
+   opts:[
+     {v:'candour',l:'Full candour — confirm the attack and data risk',tag:'Panic risk',t:'Credibility and long-run trust are protected — but candour may trigger panic and crowding, and hands the attackers leverage.'},
+     {v:'reassure',l:'Reassure and instruct — focus on what to do',tag:'Trust if exposed',t:'Crowds calm and lines keep moving — but if the data risk later surfaces, the earlier silence makes trust collapse harder.'},
+     {v:'silent',l:'Stay silent until facts are confirmed',tag:'Rumour vacuum',t:'You avoid spreading misinformation — but the rumour fills the vacuum, trust erodes and crowds grow.'}
+   ]}
+];
+
+function ratio(v,full){return full?v/full:0}
+function statusFor(r){return r>=1?'secured':r>=0.5?'partial':'failed'}
+function ransomOutcome(amt){return amt<=0?'refused':amt>=1350?'paid':'rejected'}
+function continuityScore(a){let s=0;ESSENTIALS.forEach(it=>{s+=it.weight*Math.min(1,ratio(a[it.key]||0,it.full))});return Math.round(s)}
+
+/* ---------- shared storage (Supabase) ---------- */
+const SBCFG = window.CYRENIA_CONFIG || {};
+let SB=null;
+try{
+  if(window.supabase && SBCFG.SUPABASE_URL && !/YOUR-/.test(SBCFG.SUPABASE_URL)){
+    SB=window.supabase.createClient(SBCFG.SUPABASE_URL, SBCFG.SUPABASE_ANON_KEY);
+  }
+}catch(e){}
+if(!SB){
+  window.addEventListener('DOMContentLoaded',()=>{
+    document.body.innerHTML='<div style="max-width:560px;margin:80px auto;padding:26px;font-family:system-ui,sans-serif;color:#E8E2D4;background:#161E25;border:1px solid #E5484D;border-radius:14px">'+
+    '<h2 style="font-family:monospace;color:#E5484D;margin-top:0">Setup needed</h2>'+
+    '<p style="line-height:1.6">Open <code>config.js</code> and paste in your Supabase project URL and public anon key, then run the SQL in <code>schema.sql</code>. Full steps are in the README.</p></div>';
+  });
+}
+async function sget(k){try{const {data,error}=await SB.from('kv').select('value').eq('key',k).maybeSingle();if(error||!data)return null;return data.value;}catch(e){return null}}
+async function sset(k,v){try{await SB.from('kv').upsert({key:k,value:v,updated_at:new Date().toISOString()});}catch(e){}}
+async function sdel(k){try{await SB.from('kv').delete().eq('key',k);}catch(e){}}
+async function slist(p){try{const {data,error}=await SB.from('kv').select('key').like('key',p+'%');if(error||!data)return [];return data.map(r=>r.key);}catch(e){return []}}
+async function getControl(){return (await sget('ctl')) || {sessionStart:null}}
+async function setControl(c){await sset('ctl',c)}
+
+/* ---------- state ---------- */
+let myKey=null, myName=null, started=false;
+const alloc={ransom:0,pension:0,health:0,reserve:0,municipal:0};
+const dossier={};
+let stage='dossier', dIndex=0, dPending=null;
+let sessionStart=null, breachShown=false, ransomBuilt=false;
+let audioCtx=null;
+
+/* derived timing */
+function breachTime(){return sessionStart? sessionStart+BREACH_AT_MIN*60000 : null}
+function revealTime(){return sessionStart? sessionStart+REVEAL_AT_MIN*60000 : null}
+function isRansomLive(){return sessionStart && Date.now()>=breachTime()}
+function isRevealed(){return sessionStart && Date.now()>=revealTime()}
+
+/* ---------- routing ---------- */
+function show(id){['landing','briefing','console'].forEach(v=>document.getElementById('view-'+v).classList.toggle('hidden',v!==id))}
+
+function briefingHTML(){
+  const exo=EXPOSURE.map(e=>`<div class="exo ${e.warn?'warn':''}"><div class="v">${e.v}</div><div class="k">${e.k}</div></div>`).join('');
+  const imp=IMPACTS.map(i=>`<div class="impact"><h4><span class="num">${i.n}</span> · ${i.h}</h4><p>${i.p}</p></div>`).join('');
+  return `
+    <div class="panel">
+      <div class="brief-head"><h2 style="margin:0">Situation briefing · Day 0</h2><span class="brief-stamp">14:00 · WED 24 JUN</span></div>
+      <p class="brief-lede">At 08:57 the Prime Minister confirmed on national radio that Cyrenia is under an <strong>unattributed cyberattack</strong> on essential public services. By 10:11 it was classified as AI-assisted sabotage — malware codenamed <strong>Black Orchard</strong>, delivered through a trusted software update. The systems aren't fully dead: dashboards load, messages send, AI tools still advise — but <strong>nothing recorded after 09:03 can be trusted.</strong> Your job is not to fix the attack. It is to keep people protected while data, payments and public trust are unreliable.</p>
+    </div>
+    <div class="panel"><h2>Preliminary exposure picture</h2><div class="exposure">${exo}</div></div>
+    <div class="panel"><h2>Four pressures on the system</h2><div class="impacts">${imp}</div></div>`;
+}
+
+function joinTeam(){
+  const n=document.getElementById('team-name').value.trim();
+  if(!n){document.getElementById('team-name').focus();return}
+  myName=n;
+  myKey='team_'+n.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,16)+'_'+Math.random().toString(36).slice(2,6);
+  location.hash='c/'+encodeURIComponent(myKey)+'/'+encodeURIComponent(n);
+  document.getElementById('briefing-body').innerHTML=briefingHTML();
+  show('briefing');window.scrollTo({top:0});
+}
+
+async function toConsole(){
+  show('console');
+  unlockAudio();
+  const c=await getControl();
+  if(!c.sessionStart){c.sessionStart=Date.now();await setControl(c);}
+  sessionStart=c.sessionStart;
+  stage='dossier';
+  document.getElementById('stage-dossier').classList.remove('hidden');
+  document.getElementById('stage-alloc').classList.add('hidden');
+  renderDossier();
+  window.scrollTo({top:0});
+}
+
+/* ---------- decision dossier ---------- */
+function renderDossier(){
+  const host=document.getElementById('stage-dossier');
+  const total=DOSSIER.length;
+  if(dIndex>=total){
+    host.innerHTML=`<div class="panel"><div class="dossier-done">
+      <div class="dossier-meta">Decision dossier complete</div>
+      <div class="big">Your committee's positions are recorded.</div>
+      <div class="positions" id="dossier-positions"></div>
+      <div style="margin-top:18px"><button class="btn primary btn-lg" onclick="gotoAlloc()">Proceed to allocate the reserve →</button></div>
+    </div></div>`;
+    renderPositions(document.getElementById('dossier-positions'));
+    return;
+  }
+  const d=DOSSIER[dIndex];
+  const steps=DOSSIER.map((_,i)=>`<div class="step ${i<dIndex?'done':i===dIndex?'active':''}"></div>`).join('');
+  const picked=dPending||dossier[d.key];
+  const opts=d.opts.map(o=>`<button class="opt ${picked===o.v?'sel':''}" onclick="selectOpt('${o.v}')">
+      <div class="ol">${o.l}</div>
+      <div class="otrade">${o.t}<br><span class="otag">Risk · ${o.tag}</span></div></button>`).join('');
+  host.innerHTML=`<div class="panel">
+    <div class="stepper">${steps}</div>
+    <div class="dossier-meta">${d.meta} · decision ${dIndex+1} of ${total}</div>
+    <h2 class="dossier-title">${d.title}</h2>
+    <p class="dossier-sit">${d.sit}</p>
+    <div class="gq"><h3>Guiding questions for the committee</h3><ul>${d.q.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    <div>${opts}</div>
+    <div class="btn-row"><button class="btn primary" id="commit-btn" onclick="commitImpact()" ${picked?'':'disabled'}>${dIndex<total-1?'Commit & next impact →':'Commit final position →'}</button></div>
+  </div>`;
+}
+function selectOpt(v){dPending=v;renderDossier();}
+async function commitImpact(){
+  const d=DOSSIER[dIndex];
+  const v=dPending||dossier[d.key];
+  if(!v)return;
+  dossier[d.key]=v;dPending=null;dIndex++;
+  await persistProgress();
+  renderDossier();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function renderPositions(el){
+  if(!el)return;
+  el.innerHTML=DOSSIER.map(d=>{const o=d.opts.find(x=>x.v===dossier[d.key]);return o?`<div class="position"><span class="pk">${d.title}</span><br>${o.l}</div>`:''}).join('');
+}
+function gotoAlloc(){
+  stage='alloc';
+  document.getElementById('stage-dossier').classList.add('hidden');
+  document.getElementById('stage-alloc').classList.remove('hidden');
+  buildAlloc();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function persistProgress(){
+  if(!myKey)return;
+  await sset(myKey,{name:myName,dossier:{...dossier},alloc:{...alloc},stage,ts:Date.now()});
+}
+
+/* ---------- allocation ---------- */
+function items(){return isRansomLive()? [RANSOM_ITEM,...ESSENTIALS] : ESSENTIALS.slice()}
+function buildAlloc(){
+  const list=document.getElementById('alloc-list');list.innerHTML='';
+  items().forEach(it=>{
+    const isNew=it.danger && isRansomLive();
+    const row=document.createElement('div');row.className='alloc'+(isNew?' new':'');
+    row.innerHTML=`
+      <div class="alloc-top">
+        <div>
+          <div class="alloc-name ${it.danger?'danger':''}">${it.name}${isNew?'<span class="tagnew">NEW</span>':''}</div>
+          <div class="alloc-sub">${it.sub} · full ${fmt(it.full)}</div>
+        </div>
+        <div class="alloc-val" id="val-${it.key}">${fmt(alloc[it.key]||0)}</div>
+      </div>
+      <input type="range" min="0" max="${it.full}" step="25" value="${alloc[it.key]||0}" id="rng-${it.key}" aria-label="${it.name}">
+      <div class="fundbar"><i id="fb-${it.key}"></i></div>`;
+    list.appendChild(row);
+    row.querySelector('input').addEventListener('input',e=>{alloc[it.key]=+e.target.value;refreshTeam()});
+  });
+  document.getElementById('alloc-head').textContent=isRansomLive()?'Re-allocate — the ransom is now on the table':'Allocate the reserve';
+  refreshTeam();
+}
+function refreshTeam(){
+  const its=items();
+  const spent=its.reduce((s,it)=>s+(alloc[it.key]||0),0);
+  const remaining=POOL-spent;
+  its.forEach(it=>{
+    const v=alloc[it.key]||0;
+    const ve=document.getElementById('val-'+it.key);if(ve)ve.textContent=fmt(v);
+    const fb=document.getElementById('fb-'+it.key);
+    if(fb){const r=Math.min(1,ratio(v,it.full));fb.style.width=(r*100)+'%';fb.style.background=it.danger?'var(--red)':(r>=1?'var(--teal)':r>=0.5?'var(--amber)':'var(--slate)');}
+  });
+  document.getElementById('res-fill').style.transform='scaleX('+(1-Math.min(1,spent/POOL))+')';
+  document.getElementById('reservoir').classList.toggle('over',remaining<0);
+  document.getElementById('res-spent').textContent=fmt(spent)+' committed';
+  const rem=document.getElementById('remaining');
+  rem.textContent=(remaining<0?'\u2212'+fmt(-remaining)+' over budget':fmt(remaining)+' left');
+  rem.classList.toggle('neg',remaining<0);
+  const banner=document.getElementById('phase-banner');
+  if(isRansomLive()){banner.textContent='Paying the ransom means pulling money from the people you just promised to protect.';banner.style.color='var(--red)';}
+  else{banner.textContent='Allocate the reserve across essential services to keep people protected.';banner.style.color='var(--bone-dim)';}
+  document.getElementById('lock-btn').disabled=(remaining<0)||isRevealed();
+}
+function resetSliders(){items().forEach(it=>{alloc[it.key]=0;const r=document.getElementById('rng-'+it.key);if(r)r.value=0});refreshTeam()}
+async function lockAlloc(){
+  const its=items();const spent=its.reduce((s,it)=>s+(alloc[it.key]||0),0);
+  if(spent>POOL)return;
+  await sset(myKey,{name:myName,dossier:{...dossier},alloc:{...alloc},stage:'alloc',locked:true,ts:Date.now()});
+  const st=document.getElementById('team-status');st.style.display='flex';st.className='status-line';
+  st.textContent=isRansomLive()?'\u2713 Revised allocation locked.':'\u2713 Allocation locked. You can keep adjusting until the situation changes.';
+}
+
+/* ---------- decision clock (Act 2) ---------- */
+function tickDecisionClock(){
+  const panel=document.getElementById('dclock-panel');
+  if(!isRansomLive()||isRevealed()){panel.classList.add('hidden');return}
+  panel.classList.remove('hidden');
+  let ms=revealTime()-Date.now();if(ms<0)ms=0;
+  const s=Math.floor(ms/1000),mm=String(Math.floor(s/60)).padStart(2,'0'),ss=String(s%60).padStart(2,'0');
+  const t=document.getElementById('dclock-t');
+  t.textContent=mm+':'+ss;t.className='t'+(s<=60?' crit':s<=300?' warn':'');
+  document.getElementById('dclock-l').textContent='Decision window — committee must resolve the demand';
+}
+
+/* ---------- breach ---------- */
+function unlockAudio(){try{if(!audioCtx){const C=window.AudioContext||window.webkitAudioContext;if(C)audioCtx=new C();}if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();}catch(e){}}
+function breachSound(){
+  try{
+    if(!audioCtx){const C=window.AudioContext||window.webkitAudioContext;if(C)audioCtx=new C();}
+    if(!audioCtx)return; if(audioCtx.state==='suspended')audioCtx.resume();
+    const ac=audioCtx,now=ac.currentTime;
+    [[440,0],[622,0.18],[440,0.36],[622,0.54],[330,0.72]].forEach(([f,t])=>{
+      const o=ac.createOscillator(),g=ac.createGain();o.type='square';o.frequency.value=f;
+      g.gain.setValueAtTime(0.0001,now+t);g.gain.exponentialRampToValueAtTime(0.11,now+t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,now+t+0.16);
+      o.connect(g).connect(ac.destination);o.start(now+t);o.stop(now+t+0.2);
+    });
+  }catch(e){}
+}
+function playBreach(){
+  const o=document.getElementById('breach');
+  document.getElementById('breach-target').textContent=myName?('TARGET ACQUIRED · '+myName.toUpperCase()+' — WE SEE YOUR COMMITTEE'):'BROADCAST TO ALL CONNECTED STATIONS';
+  o.classList.add('active');o.scrollTop=0;breachSound();
+}
+function dismissBreach(){
+  document.getElementById('breach').classList.remove('active');
+  if(isRansomLive()){
+    if(stage!=='alloc')gotoAlloc();
+    if(!ransomBuilt){ransomBuilt=true;buildAlloc();}
+  }
+}
+
+/* ---------- reset ---------- */
+async function resetExercise(){
+  if(!confirm('Reset the exercise for a new group? This clears every committee and restarts the 60-minute timer.'))return;
+  const keys=await slist('team_');for(const k of keys){await sdel(k)}
+  await setControl({sessionStart:null});
+  location.hash='';location.reload();
+}
+
+/* ---------- poll loop ---------- */
+async function poll(){
+  const c=await getControl();
+  if(c.sessionStart) sessionStart=c.sessionStart;
+  const breachActive=document.getElementById('breach').classList.contains('active');
+  if(sessionStart && isRansomLive() && !breachShown){breachShown=true;playBreach();}
+  if(sessionStart && isRansomLive() && !ransomBuilt && !breachActive){
+    ransomBuilt=true;
+    if(stage!=='alloc')gotoAlloc(); else buildAlloc();
+  }
+  if(stage==='alloc' && !document.getElementById('stage-alloc').classList.contains('hidden')){refreshTeam();}
+  if(isRevealed() && myKey){showTeamOutcome();}
+}
+function showTeamOutcome(){
+  const box=document.getElementById('team-outcome'),body=document.getElementById('team-outcome-body');
+  if(!box.classList.contains('hidden') && body.dataset.done==='1')return;
+  const score=continuityScore(alloc);
+  let html=`<div class="scorebig">Continuity score: <strong>${score}</strong> / 100</div>`;
+  ESSENTIALS.forEach(it=>{
+    const stt=statusFor(ratio(alloc[it.key]||0,it.full));
+    const col=stt==='secured'?'var(--teal)':stt==='partial'?'var(--amber)':'var(--red)';
+    html+=`<div class="outcome-row"><span class="st" style="color:${col}">${stt}</span> · <strong>${it.name}</strong><br><span style="color:var(--bone-dim);font-size:13px">${CONSEQ[it.key][stt]}</span></div>`;
+  });
+  const ro=RANSOM[ransomOutcome(alloc.ransom)];
+  html+=`<div class="ransom-tag ${ro.cls}">${ro.txt}</div>`;
+  const pos=DOSSIER.map(d=>{const o=d.opts.find(x=>x.v===dossier[d.key]);return o?`<div class="position"><span class="pk">${d.title}</span><br>${o.l}</div>`:''}).join('');
+  if(pos)html+=`<div style="margin-top:18px"><div class="dossier-meta" style="margin-bottom:4px">Your committee's recorded positions</div><div class="positions">${pos}</div></div>`;
+  body.innerHTML=html;body.dataset.done='1';box.classList.remove('hidden');
+  document.getElementById('dclock-panel').classList.add('hidden');
+}
+
+setInterval(()=>{if(started)tickDecisionClock()},250);
+setInterval(poll,2000);
+
+/* ---------- init ---------- */
+(function init(){
+  started=true;
+  const raw=location.hash.replace(/^#/,'');
+  if(raw.startsWith('c/')){
+    const p=raw.split('/');myKey=decodeURIComponent(p[1]||'');myName=decodeURIComponent(p[2]||'');
+    show('console');
+    getControl().then(async c=>{
+      if(!c.sessionStart){c.sessionStart=Date.now();await setControl(c);}
+      sessionStart=c.sessionStart;
+      const rec=await sget(myKey);
+      if(rec){
+        if(rec.dossier)Object.assign(dossier,rec.dossier);
+        if(rec.alloc)Object.assign(alloc,rec.alloc);
+      }
+      dIndex=DOSSIER.filter(d=>dossier[d.key]).length;
+      if(isRansomLive() || dIndex>=DOSSIER.length || (rec&&rec.stage==='alloc')){
+        gotoAlloc();
+      } else {
+        stage='dossier';
+        document.getElementById('stage-dossier').classList.remove('hidden');
+        document.getElementById('stage-alloc').classList.add('hidden');
+        renderDossier();
+      }
+    });
+  } else { show('landing'); }
+  poll();
+})();
+</script>
+</body>
+</html>
